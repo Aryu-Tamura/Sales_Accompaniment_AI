@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>営業伴走AI – デモ</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --border:#e5e7eb;
+      --surface:#f9fafb;
+      --accent:#46B839;
+      --accent-weak:rgba(70,184,57,0.12);
+      --danger:#ef4444;
+      --success:#16a34a;
+      --warn-bg:#FEF3C7;
+      --warn-bd:#FDE68A;
+      --container-w:1200px;
+      --blue: rgba(59,130,246,0.55);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;background:var(--bg);color:var(--text);} 
+    a{color:inherit}
+
+    /* Layout */
+    .app{display:grid;grid-template-columns: 76px 1fr; min-height:100vh;}
+    .sidebar{position:relative;background:#fff;border-right:1px solid var(--border);overflow:visible;width:76px;transition:width .2s ease;z-index:20}
+    .sidebar:hover{width:260px;}
+    .sidebar-inner{display:flex;flex-direction:column;height:100%;}
+    .brand{display:flex;align-items:center;gap:.75rem;padding:1rem .75rem;border-bottom:1px solid var(--border);}
+    .brand .logo{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:var(--accent-weak);} 
+    .brand .title{font-weight:700;white-space:nowrap;opacity:0;transform:translateX(-6px);transition:opacity .2s ease,transform .2s ease;}
+    .sidebar:hover .brand .title{opacity:1;transform:none;}
+
+    .nav{padding:.5rem .5rem;display:flex;flex-direction:column;gap:.25rem}
+    .nav-btn{display:flex;align-items:center;gap:.75rem;border:0;background:transparent;padding:.625rem .5rem;border-radius:.6rem;color:var(--text);width:100%;cursor:pointer;}
+    .nav-btn:hover{background:var(--surface);} 
+    .nav-btn.active{background:var(--accent-weak); color:var(--accent);}
+    .nav-btn .icon{min-width:28px;min-height:28px;display:grid;place-items:center}
+    .nav-btn .label{white-space:nowrap;opacity:0;transform:translateX(-6px);transition:opacity .2s, transform .2s;}
+    .sidebar:hover .nav-btn .label{opacity:1;transform:none;}
+    .spacer{flex:1}
+    .divider{height:1px;background:var(--border);margin:.25rem .5rem;}
+    .user{display:flex;align-items:center;gap:.75rem;padding:.75rem .5rem}
+    .user .avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#fff;border:1px solid var(--border);}
+    .user .meta{display:flex;flex-direction:column;min-width:0;opacity:0;transform:translateX(-6px);transition:opacity .2s, transform .2s;}
+    .sidebar:hover .user .meta{opacity:1;transform:none;}
+    .user .name{font-size:.9rem;font-weight:600}
+    .user .email{font-size:.78rem;color:var(--muted)}
+
+    .content{display:flex;flex-direction:column;min-width:0;}
+    .container{max-width:var(--container-w);margin:0 auto;padding:0 clamp(16px,3vw,32px)}
+
+    .page{display:none}
+    .page.active{display:block}
+    .page-inner{padding:1rem 0 2rem 0}
+
+    .heading h2{font-size:1.6rem;margin:.2rem 0 .4rem 0}
+    .heading p{color:var(--muted);margin:.2rem 0 .8rem 0}
+    .hr{height:1px;background:var(--border);margin:.75rem 0 1rem 0}
+
+    .filters{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:.8rem;align-items:center}
+    .input, select{border:1px solid var(--border);background:#fff;border-radius:.6rem;padding:.55rem .7rem;font:inherit;}
+    .btn{border:1px solid var(--border);background:#fff;border-radius:.6rem;padding:.55rem .8rem;font:inherit;cursor:pointer}
+    .btn.primary{border-color:var(--accent);color:#fff;background:var(--accent);} 
+    .btn.ghost{background:transparent}
+    .btn[disabled]{opacity:.6;cursor:not-allowed}
+    .chk{display:inline-flex;align-items:center;gap:.4rem;padding:.2rem .5rem;border:1px solid var(--border);border-radius:.6rem;background:#fff}
+
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .section{border:1px solid var(--border);border-radius:14px;background:#fff;padding:1rem}
+    .section h3{margin:.2rem 0 .6rem 0}
+    textarea{width:100%;min-height:160px;resize:vertical;border:1px solid var(--border);border-radius:.6rem;padding:.6rem;font:inherit;background:#fff}
+    .row{display:flex;gap:.5rem;flex-wrap:wrap}
+
+    /* Kanban */
+    .kanban-wrapper{overflow:auto;}
+    /* ★ 縦長に（ダミー案件増加時でも視認性） */
+    .kanban{display:flex;gap:1rem;min-height:760px;padding-bottom:1rem}
+    .column{background:#fff;border:1px solid var(--border);border-radius:12px;min-width:280px;max-width:280px;display:flex;flex-direction:column}
+    .column-header{padding:.75rem .9rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;font-weight:600}
+    .count{margin-left:auto;font-size:.8rem;color:var(--muted)}
+    .cards{padding:.75rem;display:flex;flex-direction:column;gap:.75rem}
+    .card{border:1px solid var(--border);border-radius:12px;background:#f9fafb;padding:.6rem .7rem;cursor:pointer}
+    .card .title{font-weight:600;margin-bottom:.25rem}
+    .chip{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;padding:.15rem .5rem;border-radius:999px;border:1px solid var(--border);background:#fff;color:var(--text)}
+    .chip.warn{background:var(--warn-bg);border-color:var(--warn-bd)}
+    .chip.big{background:var(--accent-weak);border-color:var(--accent)}
+
+    /* Drawer */
+    .drawer{position:fixed;inset:0;display:none;z-index:50}
+    .drawer.open{display:block}
+    .drawer .overlay{position:absolute;inset:0;background:rgba(0,0,0,.25)}
+    .drawer .panel{position:absolute;right:0;top:0;height:100%;width:min(560px,92vw);background:#fff;border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.08);display:flex;flex-direction:column}
+    .drawer .panel .hd{display:flex;align-items:center;gap:.75rem;padding:1rem;border-bottom:1px solid var(--border)}
+    .drawer .panel .bd{padding:1rem;overflow:auto;display:flex;flex-direction:column;gap:1rem}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+    .kv{display:flex;flex-direction:column;gap:.25rem}
+    .kv .k{font-size:.85rem;color:var(--muted)}
+    .kv .v{font-weight:600}
+    .progress{height:10px;border:1px solid var(--border);border-radius:999px;background:#fff;overflow:hidden}
+    .progress .bar{height:100%;width:0;background:var(--accent);}
+    .progress-label{font-size:.9rem;color:var(--muted);}
+
+    /* Tabs inside pages */
+    .tabs{display:flex;gap:.5rem;margin-bottom:.6rem}
+    .tab{border:1px solid var(--border);background:#fff;padding:.4rem .7rem;border-radius:.6rem;cursor:pointer}
+    .tab.active{background:var(--accent-weak);border-color:var(--accent);color:var(--text)}
+
+    /* Chat area */
+    .chat-box{border:1px solid var(--border);border-radius:12px;background:#fff;height:280px;overflow:auto;padding:.75rem;display:flex;flex-direction:column;gap:.5rem}
+    .msg{padding:.5rem .6rem;border-radius:.6rem;max-width:90%}
+    .msg.user{align-self:flex-end;background:#e5f2ff;border:1px solid #cfe7ff}
+    .msg.bot{align-self:flex-start;background:#f3f4f6;border:1px solid var(--border)}
+
+    /* Overlay (busy lock) */
+    .overlay{position:absolute;inset:0;background:rgba(255,255,255,.6);display:none;align-items:center;justify-content:center;border-radius:12px}
+    .overlay.show{display:flex}
+    .spinner{width:42px;height:42px;border:5px solid #ddd;border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .relative{position:relative}
+
+    /* Table (used minimal now) */
+    table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    th,td{border-bottom:1px solid var(--border);padding:.7rem .8rem;text-align:left}
+    th{background:#f9fafb;font-weight:700;color:#374151}
+
+    /* Form: 1 column stack */
+    .form-stack{display:flex;flex-direction:column;gap:.9rem}
+    .field{display:flex;flex-direction:column;gap:.35rem}
+    .field .label{font-size:.9rem;color:var(--muted)}
+    .amount-row{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+
+    /* Running steps (vertical) */
+    .steps{display:flex;flex-direction:column;gap:.75rem}
+    .step{border:1px solid var(--border);border-radius:12px;padding:.9rem;display:flex;align-items:center;gap:.75rem;background:#fff}
+    .dot{width:12px;height:12px;border-radius:999px;background:#d1d5db}
+    .step.done .dot{background:var(--accent)}
+
+    /* ★ 追加：実行中の視覚状態 */
+    .step.running .dot{
+      background:#9ca3af;                /* 実行中は水色 */
+      box-shadow:0 0 0 3px rgba(147,197,253,.30) inset;
+    }
+    /* 右端のステータス欄の幅を安定させる */
+    .step .sub{ min-width:72px; text-align:right; }
+
+
+    .step .label{font-weight:600}
+    .step .sub{margin-left:auto;color:var(--muted);font-size:.9rem}
+
+
+
+    /* 右端ステータスの見た目強化 */
+    .step .sub{margin-left:auto;color:var(--muted);font-size:.9rem;display:flex;align-items:center;gap:.4rem}
+    .lamp{width:12px;height:12px;border-radius:999px;background:#d1d5db;box-shadow:inset 0 0 0 1px #cbd5e1}
+    .lamp.on{background:var(--success);box-shadow:0 0 0 3px rgba(22,163,74,.22), inset 0 0 0 1px #0f7a2a}
+    .status{min-width:3.5em}
+
+  
+
+    /* === ここから追記：会話データの可読性向上 === */
+    /* 一括り表示の <pre id="turns-pre"> を大きめフォント＆行間広めに */
+    #edit-tab-transcript #turns-pre{
+      font-size: 1.1rem;
+      line-height: 1.8;
+      white-space: pre-wrap; /* 折り返し */
+    }
+    /* 旧版の #turns-list を使っている場合の保険 */
+    #edit-tab-transcript #turns-list{
+      font-size: 1.1rem;
+      line-height: 1.8;
+    }
+    /* 枠の見た目（使い回しクラス） */
+    .transcript-box{
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      padding: .9rem;
+    }
+
+    /* Minutes preview default size */
+    #minutes-preview{min-height:600px}
+  </style>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" aria-label="サイドナビ">
+      <div class="sidebar-inner">
+        <div class="brand">
+          <div class="logo">🏷️</div>
+          <div class="title">営業伴走AI</div>
+        </div>
+        <nav class="nav">
+          <button class="nav-btn active" data-page="dashboard"><span class="icon">📊</span><span class="label">ダッシュボード</span></button>
+          <button class="nav-btn" data-page="performance"><span class="icon">📈</span><span class="label">業績比較</span></button>
+          <button class="nav-btn" data-page="minutes"><span class="icon">📝</span><span class="label">議事録作成</span></button>
+          <button class="nav-btn" data-page="reports"><span class="icon">📅</span><span class="label">日報・週報確認</span></button>
+        </nav>
+        <div class="spacer"></div>
+        <div class="divider"></div>
+        <div class="user">
+          <div class="avatar">👤</div>
+          <div class="meta">
+            <div class="name">ユーザー</div>
+            <div class="email">user@example.com</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="content" id="main-content">
+      <!-- Dashboard -->
+      <section class="page active" id="page-dashboard">
+        <div class="container">
+          <div class="page-inner">
+            <div class="heading">
+              <h2>ダッシュボード</h2>
+              <p>案件ごとの進捗状況を確認できます（DBから取得）。</p>
+            </div>
+            <div class="hr"></div>
+
+            <div class="filters" aria-label="フィルター">
+              <select id="filter-owner" class="input" aria-label="担当者で絞り込み">
+                <option value="">全担当者</option>
+                <option>田中真奈美</option>
+                <option>渡辺徹</option>
+                <option>小林恭子</option>
+                <option>工藤学</option>
+                <option>工藤新一</option>
+              </select>
+              <label class="chk"><input type="checkbox" class="label-filter" value="要注意"> 要注意</label>
+              <label class="chk"><input type="checkbox" class="label-filter" value="大型案件"> 大型案件</label>
+              <div class="row" style="align-items:center">
+                <span style="font-size:.9rem;color:var(--muted)">日付</span>
+                <input type="date" id="filter-date-from" class="input" style="margin-left:.5rem"/>
+                <span style="margin:0 .35rem">〜</span>
+                <input type="date" id="filter-date-to" class="input"/>
+                <button id="filter-date-clear" class="btn" style="margin-left:.5rem">クリア</button>
+              </div>
+            </div>
+
+            <div id="kanban" class="kanban-wrapper">
+              <div class="kanban" id="kanban-columns"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Performance -->
+      <section class="page" id="page-performance">
+        <div class="container">
+          <div class="page-inner">
+            <div class="heading">
+              <h2>業績比較</h2>
+              <p>会社全体の営業活動の実績を確認できます（ダミー）。</p>
+            </div>
+            <div class="hr"></div>
+
+            <!-- KPI cards（3枚を横一列に） -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem">
+              <div class="section">
+                <h3>今月の取扱額合計</h3>
+                <div id="kpi-amount" style="font-size:1.6rem;font-weight:800">¥ 214,000,000</div>
+                <div id="kpi-amount-diff" style="color:var(--success);margin-top:.25rem">前月比 +7.3%</div>
+              </div>
+              <div class="section">
+                <h3>目標達成率</h3>
+                <div id="kpi-achv" style="font-size:1.6rem;font-weight:800">104%</div>
+                <div style="color:var(--muted);margin-top:.25rem">目標に対する進捗</div>
+              </div>
+              <div class="section">
+                <h3>融資実行件数</h3>
+                <div id="kpi-count" style="font-size:1.6rem;font-weight:800">6件</div>
+                <div style="color:#ef4444;margin-top:.25rem">前月比 -2件</div>
+              </div>
+            </div>
+
+            <div class="section" style="margin-top:1rem">
+              <h3>週ごとの商談件数（今月〜過去4ヶ月）</h3>
+              <div id="weekly-bars" style="height:340px"></div>
+            </div>
+
+            <div class="section" style="margin-top:1rem">
+              <h3>補足説明</h3>
+              <p style="margin:.3rem 0 0 0; color:var(--muted)">
+                月別・週別での商談件数の推移を可視化しています。薄い点線は週あたりの目標件数（50件）です。実績が目標線を上回る週は各部の新規開拓が奏功し、下回る週は既存深耕が中心の傾向です。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- Minutes -->
+      <section class="page" id="page-minutes">
+        <div class="container">
+          <div class="page-inner">
+            <div class="heading">
+              <h2>議事録作成</h2>
+              <p>会議音声・テキストから議事録を自動生成します。</p>
+            </div>
+            <div class="hr"></div>
+
+            <!-- Step: input -->
+            <div id="min-step-input" class="section">
+              <h3>事前情報の入力</h3>
+
+              <!-- 入力方法 -->
+              <div class="section" style="margin-bottom:1rem">
+                <div class="row">
+                  <label class="chk"><input type="radio" name="inputMode" value="audio"> 音声ファイルをアップロード</label>
+                  <label class="chk"><input type="radio" name="inputMode" value="text" checked> 商談テキストを直接入力</label>
+                </div>
+              </div>
+
+              <!-- 縦1列フォーム -->
+              <div class="form-stack">
+                <div class="field">
+                  <div class="label">会社名</div>
+                  <input id="i-company" class="input" placeholder="例）QRS物流"/>
+                </div>
+                <div class="field">
+                  <div class="label">商談日</div>
+                  <input id="i-date" type="date" class="input"/>
+                </div>
+                <div class="field">
+                  <div class="label">直前ステージ</div>
+                  <select id="i-prev-stage" class="input">
+                    <option>リード</option><option selected>商談</option><option>提案・概算条件の提示</option>
+                    <option>申込・審査</option><option>稟議書認証</option><option>契約手続き</option><option>融資実行</option><option>失注</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <div class="label">銀行側担当者</div>
+                  <select id="i-owner-bank" class="input">
+                    <option>田中真奈美</option><option>渡辺徹</option><option>小林恭子</option><option>工藤学</option><option>工藤新一</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <div class="label">顧客側担当者</div>
+                  <input id="i-owner-client" class="input" placeholder="例）CFO佐々木"/>
+                </div>
+                <div class="field">
+                  <div class="label">商談回数</div>
+                  <input id="i-meetings" type="number" min="1" value="1" class="input" />
+                </div>
+                <div class="field">
+                  <div class="label">取扱予想金額</div>
+                  <div class="amount-row">
+                    <label class="chk"><input type="radio" name="amountMode" value="unset" checked> 未定</label>
+                    <label class="chk"><input type="radio" name="amountMode" value="set"> 入力する</label>
+                    <input id="i-amount" type="number" min="0" class="input" placeholder="円" style="display:none;width:200px"/>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Audio or Text -->
+              <div id="box-audio" class="section" style="margin-top:1rem; display:none">
+                <h3>音声ファイル</h3>
+                <input id="i-audio" type="file" accept="audio/*" />
+              </div>
+              <div id="box-text" class="section" style="margin-top:1rem">
+                <h3>商談テキスト</h3>
+                <textarea id="i-transcript" placeholder="[00:00:03] 銀行: 本日は...&#10;[00:00:10] 顧客: 検討して..."></textarea>
+              </div>
+
+              <div class="section" style="margin-top:1rem">
+                <div class="row">
+                  <button id="btn-gen" class="btn primary">議事録を生成</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step: running (縦並び) -->
+            <div id="min-step-running" class="section" style="display:none">
+              <div class="row">
+                <button class="btn ghost" id="btn-back-to-input">← 戻る</button>
+              </div>
+              <h3>処理中</h3>
+              <div class="steps">
+                <div class="step" id="stp1">
+                  <div class="dot"></div>
+                  <div class="label">Step1：文字起こし</div>
+                  <div class="sub" id="stp1-sub">
+                    <span class="spinner" id="stp1-spin" style="width:18px;height:18px;border-width:3px"></span>
+                    <span class="status" id="stp1-status">処理中…</span>
+                    <span class="lamp" id="stp1-lamp" aria-hidden="true"></span>
+                    </div>
+                </div>
+
+                <div class="step" id="stp2">
+                  <div class="dot"></div>
+                  <div class="label">Step2：話者分離</div>
+                  <div class="sub" id="stp2-sub">
+                    <span class="spinner" id="stp2-spin" style="width:18px;height:18px;border-width:3px"></span>
+                    <span class="status" id="stp2-status">処理中…</span>
+                    <span class="lamp" id="stp2-lamp" aria-hidden="true"></span>
+                  </div>
+                </div>
+
+                <div class="step" id="stp3">
+                  <div class="dot"></div>
+                  <div class="label">Step3：議事録作成</div>
+                  <div class="sub" id="stp3-sub">
+                    <span class="spinner" id="stp3-spin" style="width:18px;height:18px;border-width:3px"></span>
+                    <span class="status" id="stp3-status">処理中…</span>
+                    <span class="lamp" id="stp3-lamp" aria-hidden="true"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step: edit -->
+            <div id="min-step-edit" style="display:none">
+              <div class="row" style="margin-bottom:.5rem; align-items:center">
+                <button id="btn-go-analysis" class="btn" style="margin-left:auto; display:none">商談分析へ進む →</button>
+              </div>
+
+              <div class="tabs">
+                <div class="tab active" data-edit-tab="edit">議事録の編集</div>
+                <div class="tab" data-edit-tab="transcript">会話データの表示</div>
+              </div>
+
+              <div id="edit-tab-edit">
+                <div class="grid">
+                  <!-- 左：ステージ + 根拠 + チャット -->
+                  <div class="section relative">
+                    <div class="overlay" id="lock-edit"><div class="spinner"></div></div>
+
+                    <h3>ステージ変更の確認</h3>
+                    <div class="row" style="align-items:center">
+                      <select id="sel-stage" class="input">
+                        <!--<option>リード</option><option>商談</option><option>提案・概算条件の提示</option> -->
+                        <option>申込・審査</option><option>稟議書認証</option><option>契約手続き</option><option>融資実行</option><option>失注</option>
+                      </select>
+                    </div>
+
+                    <div id="stage-proposal-box" style="margin-top:.5rem">
+                      <div id="stage-prop-line" class="chip" style="background:#eef7ff;border-color:#cfe7ff">LLM提案: —</div>
+                      <div id="stage-prop-why" style="color:var(--muted);margin-top:.3rem"></div>
+                    </div>
+
+                    <div id="stage-evidence" style="margin-top:.75rem; color:var(--muted)"></div>
+
+                    <h3 style="margin-top:1rem">チャットで議事録を修正</h3>
+                    <div class="chat-box" id="chat-box"></div>
+                    <div class="row" style="margin-top:.5rem">
+                      <input id="chat-input" class="input" placeholder="例：決定事項に納期合意を追記してください" style="flex:1"/>
+                      <button id="chat-send" class="btn">送信</button>
+                    </div>
+                  </div>
+
+                  <!-- 右：プレビュー（直接編集可） -->
+                  <div class="section relative" id="preview-panel">
+                    <span class="chip saved-chip" id="chip-saved" style="display:none">保存済み</span>
+                    <div class="overlay" id="lock-preview"><div class="spinner"></div></div>
+                    <h3>議事録プレビュー（直接編集可）</h3>
+                    <textarea id="minutes-preview"></textarea>
+                    <div class="row" style="margin-top:.5rem">
+                      <button id="btn-save-minutes" class="btn primary">この議事録で保存</button>
+                      <a id="btn-download-docx" class="btn" href="#" target="_blank" style="display:none">Word（.docx）でダウンロード</a>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <div id="edit-tab-transcript" style="display:none">
+                <div class="section">
+                  <h3>会話データ（話者分離済み）</h3>
+                  <!-- ★ 一括枠で表示 -->
+                  <pre id="turns-pre" class="transcript-box">（データなし）</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step: analysis -->
+            <div id="min-step-analysis" style="display:none">
+              <div class="row" style="margin-bottom:.5rem; align-items:center">
+                <button class="btn ghost" id="btn-back-to-edit">← 戻る</button>
+                <button class="btn" id="btn-new-minutes" style="margin-left:auto">＋ 新しい議事録を作成</button>
+
+              </div>
+              <div class="tabs">
+                <div class="tab active" data-ana-tab="risks">リスク推定</div>
+                <div class="tab" data-ana-tab="coach">担当者へのフィードバック</div>
+              </div>
+
+              <div id="ana-tab-risks">
+                <div class="section">
+                  <h3>上司への報告</h3>
+                  <div id="manager-report" style="white-space:pre-wrap"></div>
+                </div>
+                <div class="section">
+                  <h3>リスク一覧
+                    <span id="risk-label-suggest" class="chip warn" style="display:none;margin-left:.5rem">要注意ラベルを付与</span>
+                  </h3>
+                  <div id="risk-list"></div>
+                </div>
+              </div>
+
+              <div id="ana-tab-coach" style="display:none">
+                <div class="section">
+                  <h3>会話バランス</h3>
+                  <div class="row" style="align-items:center; justify-content:center">
+                    <div id="pie" style="width:420px; max-width:100%; height:320px; margin:0 auto"></div>
+                  </div>
+                  <div id="coach-msg" style="margin-top:.25rem"></div>
+                </div>
+                <!-- ★★★ フェーズに基づくTips：このブロックを #ana-tab-coach の末尾に追記 ★★★ -->
+                <div class="section" style="margin-top:1rem">
+                  <h3>フェーズに基づくアドバイス</h3>
+                  <div id="phase-tips" style="white-space:pre-wrap"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reports -->
+      <section class="page" id="page-reports">
+        <div class="container">
+          <div class="page-inner">
+            <div class="heading">
+              <h2>日報・週報確認</h2>
+              <p>営業活動全体の日報・週報を確認できます（ダミー表示）。</p>
+            </div>
+            <div class="hr"></div>
+
+            <!-- 日報（縦並びカード） -->
+            <div class="section">
+              <h3>過去の日報</h3>
+              <div style="display:flex;flex-direction:column;gap:.8rem">
+                <div style="border:1px solid var(--border);border-radius:12px;padding:.8rem">
+                  <div style="font-size:1.1rem;font-weight:800">8/24 の商談数：14件</div>
+                  <div style="margin-top:.4rem">QRS物流と条件の擦り合わせ。次回提案に向け、必要書類の確認を実施。</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:12px;padding:.8rem">
+                  <div style="font-size:1.1rem;font-weight:800">8/23 の商談数：9件</div>
+                  <div style="margin-top:.4rem">山田商会の紹介対応。初回面談を来週に設定、要件の事前ヒアリングを実施。</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 週報（縦並びカード） -->
+            <div class="section" style="margin-top:1rem">
+              <h3>過去の週報</h3>
+              <div style="display:flex;flex-direction:column;gap:.8rem">
+                <div style="border:1px solid var(--border);border-radius:12px;padding:.8rem">
+                  <div style="font-size:1.1rem;font-weight:800">8月 第3週の商談数：62件 <span style="color:var(--success);font-weight:700;margin-left:.4rem">+8件</span></div>
+                  <div style="margin-top:.4rem">新規開拓が増加し、既存深耕も堅調。来週は面談の決裁者同席率を上げる方針。</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:12px;padding:.8rem">
+                  <div style="font-size:1.1rem;font-weight:800">8月 第2週の商談数：54件 <span style="color:#ef4444;font-weight:700;margin-left:.4rem">-5件</span></div>
+                  <div style="margin-top:.4rem">大型商談の稟議前対応が中心。新規はやや減、CFO レベルとの接点強化を継続。</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Drawer: 案件詳細 -->
+  <div class="drawer" id="drawer" aria-hidden="true">
+    <div class="overlay" id="drawer-overlay"></div>
+    <div class="panel" role="dialog" aria-modal="true">
+      <div class="hd">
+        <button class="btn" id="drawer-close" aria-label="閉じる">✕</button>
+        <h3 id="drawer-title">案件詳細</h3>
+      </div>
+      <div class="bd">
+        <div class="meta-grid">
+          <div class="kv"><div class="k">社名</div><div class="v" id="d-company">—</div></div>
+          <div class="kv"><div class="k">予定取扱額</div><div class="v" id="d-amount">—</div></div>
+          <div class="kv"><div class="k">直近の商談日</div><div class="v" id="d-start">—</div></div>
+          <div class="kv"><div class="k">担当</div><div class="v" id="d-owner">—</div></div>
+        </div>
+        <div class="kv"><div class="k">与信状況</div><div class="v" id="d-credit">—</div></div>
+        <div class="kv"><div class="k">関係者</div><div class="v" id="d-stakeholders">—</div></div>
+        <div class="section">
+          <h3>作業進捗</h3>
+          <div class="progress"><div class="bar" id="d-progress-bar"></div></div>
+          <div class="progress-label" id="d-progress-label">—</div>
+        </div>
+        <details>
+          <summary>過去の議事録</summary>
+          <div id="d-past-minutes" style="margin-top:.5rem;display:flex;flex-direction:column;gap:.5rem"></div>
+        </details>
+        <details>
+          <summary>今後の予定</summary>
+          <ul id="d-schedules" style="margin:.6rem 0 0 1rem;padding:0 0 0 1rem"></ul>
+        </details>
+        <!-- ★ 追加：上司への報告（最新ミーティングから取得） -->
+        <details>
+          <summary>上司への報告</summary>
+          <div id="d-manager-report" style="white-space:pre-wrap;margin-top:.5rem;color:#111"></div>
+          <div id="d-risk-list" style="margin-top:.75rem"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------- helpers --------------------
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+    const api = {
+      get: (url) => fetch(url).then(r => r.ok ? r.json() : r.text().then(t=>{throw new Error(t)})),
+      postJSON: (url, body) => fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r => r.ok ? r.json() : r.text().then(t=>{throw new Error(t)})),
+      postForm: (url, formData) => fetch(url,{method:'POST',body:formData}).then(r => r.ok ? r.json() : r.text().then(t=>{throw new Error(t)})),
+    };
+
+    const STAGES = ["リード","商談","提案・概算条件の提示","申込・審査","稟議書認証","契約手続き","融資実行","失注"];
+
+    // ダッシュボードでは「リード」を除外して表示
+    const DASHBOARD_STAGES = STAGES.filter(s => s !== "リード");
+
+
+    // ★ 追加：ステージ名の正規化（候補→必ず STAGES のどれか1つ）
+    function coerceToValidStage(to, fallback){
+      const TRIM = s => String(s||"").replace(/\s+/g,"").trim();
+      const ALIAS = {
+        "提案": "提案・概算条件の提示",
+        "概算条件提示": "提案・概算条件の提示",
+        "提案条件提示": "提案・概算条件の提示",
+        "申込": "申込・審査",
+        "審査": "申込・審査",
+        "稟議": "稟議書認証",
+        "契約": "契約手続き",
+        "実行": "融資実行",
+      };
+
+      let t = TRIM(to);
+      if (!t) return fallback || "商談";
+      if (STAGES.includes(t)) return t;
+      if (ALIAS[t]) return ALIAS[t];
+
+      // “提案・概算…” の一部だけなど曖昧入力の救済
+      for (const v of STAGES){
+        if (TRIM(v) === t || v.includes(to) || t.includes(v)) return v;
+      }
+      return fallback || "商談";
+    }
+
+
+
+    const state = {
+      // dashboard
+      filterOwner: "",
+      filterLabels: new Set(),
+      filterDateFrom: null,
+      filterDateTo: null,
+      columns: {},
+
+      // minutes flow
+      minutesStep: "input", // input | running | edit | analysis
+      inputMode: "text",    // audio | text
+      amountMode: "unset",  // unset | set
+
+      // context
+      ctx: {
+        company: "", meeting_date: "", prev_stage:"商談",
+        owner_bank:"田中真奈美", owner_client:"", meetings_count:1, amount: null
+      },
+
+      // ids
+      meetingId: null,
+
+      // generation results
+      turns: [],
+      evidence: null, infer: null, narratives: null,
+      coach_feedback: "", // ★ 追加
+
+
+      // edit
+      stageSelected: "商談",
+      minutes_draft: "",
+      manager_report: "",
+      risks: [],
+
+      // save
+      docxUrl: "", pdfUrl: ""
+    };
+
+    function setPage(name){
+      $$(".page").forEach(p=>p.classList.remove("active"));
+      $("#page-"+name).classList.add("active");
+      $$(".nav-btn").forEach(b=>b.classList.toggle("active", b.dataset.page===name));
+      if (name==="performance") renderPerformance();
+    }
+
+    // -------------------- dashboard --------------------
+    async function loadDashboard(){
+      const params = new URLSearchParams();
+      if (state.filterOwner) params.set("owner", state.filterOwner);
+      if (state.filterLabels.size){
+        params.set("labels", Array.from(state.filterLabels).join(","));
+      }
+      const data = await api.get("/api/dashboard/list"+(params.toString()?`?${params.toString()}`:""));
+      state.columns = data.columns || {};
+      renderKanban();
+    }
+
+    function renderKanban(){
+      const kc = $("#kanban-columns");
+      kc.innerHTML = "";
+      for (const stage of DASHBOARD_STAGES){
+        const items = (state.columns[stage] || []).filter(itemMatchesDate);
+        const col = document.createElement("div");
+        col.className = "column";
+        col.innerHTML = `
+          <div class="column-header">${stage} <span class="count">${items.length}</span></div>
+          <div class="cards"></div>
+        `;
+        const cards = col.querySelector(".cards");
+        for (const it of items){
+          const card = document.createElement("div");
+          card.className = "card";
+          card.dataset.dealId = it.deal_id;
+          card.innerHTML = `
+            <div class="title">${it.company}</div>
+            <div class="row">
+              ${it.owner?`<span class="chip">担当: ${it.owner}</span>`:""}
+              ${it.meeting_date?`<span class="chip">日付: ${it.meeting_date}</span>`:""}
+              ${Array.isArray(it.labels)? it.labels.map(l=>`<span class="chip ${l==='要注意'?'warn':''} ${l==='大型案件'?'big':''}">${l}</span>`).join(""):""}
+            </div>
+          `;
+          card.addEventListener("click", ()=> openDrawer(it.deal_id));
+          cards.appendChild(card);
+        }
+        kc.appendChild(col);
+      }
+    }
+
+    function itemMatchesDate(it){
+      // カードに出している meeting_date を最優先で使う。他の候補があればフォールバック
+      const ds = it.meeting_date || it.date || it.start_date || (it.deal && it.deal.start_date);
+      if (!ds) return true; // 日付が無いものは一旦表示（必要なら false でもOK）
+
+      // "YYYY-MM-DD" または ISO 文字列に対応
+      const d = new Date(ds.length <= 10 ? (ds + "T00:00:00") : ds);
+
+      if (state.filterDateFrom && d < state.filterDateFrom) return false;
+      if (state.filterDateTo && d > state.filterDateTo) return false;
+      return true;
+    }
+
+
+    async function openDrawer(dealId){
+      try{
+        const d = await api.get(`/api/deals/${dealId}`);
+        $("#drawer-title").textContent = "案件詳細";
+        $("#d-company").textContent = d.company || d.deal?.company || "—";
+        const amount = (d.amount ?? d.deal?.amount);
+        $("#d-amount").textContent = (amount!=null)?`¥ ${Number(amount).toLocaleString()}`:"—";
+        // 直近の商談日 = past_minutesの最上位 or start_date
+        // 直近の商談日：サーバ計算の recent_meeting_date を優先
+        const recent = d.recent_meeting_date || ((d.past_minutes && d.past_minutes.length) ? d.past_minutes[0].created_at : (d.start_date || d.deal?.start_date));
+        $("#d-start").textContent = recent || "—";
+
+        $("#d-owner").textContent = d.owner || d.deal?.owner || "—";
+        const creditObj = d.credit || d.deal?.credit || {};
+        $("#d-credit").textContent = Object.keys(creditObj).length ? Object.entries(creditObj).map(([k,v])=>`${k}${v?` ${v}`:""}`).join(" / ") : "—";
+        const stakeholders = d.stakeholders || d.deal?.stakeholders || [];
+        $("#d-stakeholders").innerHTML = (stakeholders.length ? stakeholders.map(s=>`<span class="chip">${s}</span>`).join(" ") : "—");
+
+        const p = d.progress_pct ?? d.deal?.progress_pct ?? 0;
+        $("#d-progress-bar").style.width = p + "%";
+        const stageLabel = d.stage || d.deal?.stage || "—";
+        $("#d-progress-label").textContent = p===100 ? "完了（融資実行）" : `進捗: ${p}% ／ ステージ: ${stageLabel}`;
+
+        const pm = $("#d-past-minutes");
+        pm.innerHTML = (d.past_minutes||[]).length
+          ? d.past_minutes.map(m=>`<div style="padding:.5rem;border:1px solid var(--border);border-radius:10px">
+              <div style="color:var(--muted);font-size:.85rem">${m.created_at||""}</div>
+              <div>${(m.excerpt||"").slice(0,80)}...</div>
+            </div>`).join("")
+          : "（なし）";
+
+        const sc = $("#d-schedules");
+        const schedules = d.schedules || d.schedule || d.deal?.schedule || [];
+        sc.innerHTML = schedules.map(s=>`<li>${s.date?`${s.date}：`:``}${s.text || s.item_text || s}</li>`).join("");
+
+        // 上司への報告 & リスク（最新 meeting_id があれば取得）
+        $("#d-manager-report").textContent = "";
+        $("#d-risk-list").innerHTML = "";
+        const latestMid = (d.past_minutes && d.past_minutes.length) ? d.past_minutes[0].meeting_id : null;
+        if (latestMid){
+          const ana = await api.get(`/api/analysis/risks?meeting_id=${encodeURIComponent(latestMid)}`).catch(()=>null);
+          if (ana){
+            $("#d-manager-report").textContent = ana.manager_report || "（報告なし）";
+            $("#d-risk-list").innerHTML = (ana.risks||[]).map(r=>`
+              <div style="border:1px solid var(--border);border-radius:10px;padding:.6rem;margin:.4rem 0">
+                <div><b>[${r.severity||""}] ${r.category||""}</b></div>
+                ${r.evidence_span? `<pre style="white-space:pre-wrap;background:#f9fafb;border:1px solid var(--border);padding:.45rem;border-radius:8px;margin-top:.4rem">${escapeHtml(r.evidence_span)}</pre>`:""}
+              </div>
+            `).join("");
+          }
+        }
+
+        $("#drawer").classList.add("open");
+        $("#drawer").setAttribute("aria-hidden","false");
+        enableOutsideCloseSoon(); // ← 同一クリックで即閉じないためのディレイ有効化
+      }catch(e){
+        alert("詳細取得に失敗しました: " + e);
+      }
+    }
+    function closeDrawer(){
+      $("#drawer").classList.remove("open");
+      $("#drawer").setAttribute("aria-hidden","true");
+    }
+
+    // === ドロワー外クリックで閉じる（安全版） ===
+    const drawerEl = document.getElementById("drawer");
+    const drawerPanelEl = drawerEl.querySelector(".panel");
+    let allowOutsideClose = false;
+
+    function enableOutsideCloseSoon() {
+      allowOutsideClose = false;
+      setTimeout(() => { allowOutsideClose = true; }, 0);
+    }
+
+    // オーバーレイ / × ボタン / Esc で閉じる
+    $("#drawer-overlay").addEventListener("click", closeDrawer);
+    $("#drawer-close").addEventListener("click", closeDrawer);
+    document.addEventListener("keydown", e=>{ if(e.key==='Escape') closeDrawer(); });
+
+    // パネル内クリックはバブリング停止（外側扱いにさせない保険）
+    drawerPanelEl.addEventListener("click", (e) => e.stopPropagation());
+
+    // ドキュメントのどこをクリックしても、パネル外なら閉じる
+    document.addEventListener("click", (e) => {
+      if (!drawerEl.classList.contains("open") || !allowOutsideClose) return;
+      if (drawerPanelEl.contains(e.target)) return; // 内側は無視
+      closeDrawer();
+    });
+
+    // filters
+    $("#filter-owner").addEventListener("change", ()=>{
+      state.filterOwner = $("#filter-owner").value;
+      loadDashboard();
+    });
+    $$(".label-filter").forEach(ch=>{
+      ch.addEventListener("change", ()=>{
+        if (ch.checked) state.filterLabels.add(ch.value); else state.filterLabels.delete(ch.value);
+        loadDashboard();
+      });
+    });
+
+    // date filters
+    const elFrom = document.getElementById("filter-date-from");
+    const elTo   = document.getElementById("filter-date-to");
+    const elClr  = document.getElementById("filter-date-clear");
+
+    if (elFrom) elFrom.addEventListener("change", ()=>{
+      state.filterDateFrom = elFrom.value ? new Date(elFrom.value + "T00:00:00") : null;
+      renderKanban(); // 取得済みデータに対して前段で絞り込む
+    });
+    if (elTo) elTo.addEventListener("change", ()=>{
+      state.filterDateTo = elTo.value ? new Date(elTo.value + "T23:59:59") : null;
+      renderKanban();
+    });
+    if (elClr) elClr.addEventListener("click", ()=>{
+      elFrom.value = ""; elTo.value = "";
+      state.filterDateFrom = null; state.filterDateTo = null;
+      renderKanban();
+    });
+
+
+
+    // -------------------- minutes: inputs --------------------
+    // input mode switch
+    $$("input[name='inputMode']").forEach(r=>{
+      r.addEventListener("change", ()=>{
+        state.inputMode = r.value;
+        $("#box-audio").style.display = (state.inputMode==='audio')?"block":"none";
+        $("#box-text").style.display = (state.inputMode==='text')?"block":"none";
+      });
+    });
+    // amount mode
+    $$("input[name='amountMode']").forEach(r=>{
+      r.addEventListener("change", ()=>{
+        state.amountMode = r.value;
+        $("#i-amount").style.display = (state.amountMode==='set')?"block":"none";
+      });
+    });
+
+function setStepStatus(n, status){
+  const el = $(`#stp${n}`);
+  el.classList.remove("done","running");
+  if (status === "done"){
+    el.classList.add("done");
+    $(`#stp${n}-sub`).textContent = "完了";
+  }else if (status === "running"){
+    el.classList.add("running");
+    $(`#stp${n}-sub`).innerHTML = `<span class="spinner" style="width:18px;height:18px;border-width:3px"></span>`;
+  }else{
+    $(`#stp${n}-sub`).textContent = "—";
+  }
+}
+function markStepSpin(n){
+  [1,2,3].forEach(i=>{ $(`#stp${i}`).classList.remove("running"); });
+  setStepStatus(n, "running");
+}
+function markStepDone(n){
+  setStepStatus(n, "done");
+}
+
+
+    // generate minutes
+    $("#btn-gen").addEventListener("click", async ()=>{
+      // collect context
+      const ctx = state.ctx;
+      ctx.company = $("#i-company").value.trim();
+      ctx.meeting_date = $("#i-date").value;
+      ctx.prev_stage = $("#i-prev-stage").value;
+      ctx.owner_bank = $("#i-owner-bank").value;
+      ctx.owner_client = $("#i-owner-client").value.trim();
+      ctx.meetings_count = parseInt($("#i-meetings").value||"1",10);
+      ctx.amount = (state.amountMode==='set') ? (Number($("#i-amount").value)||0) : null;
+    
+      if (!ctx.company || !ctx.meeting_date || !ctx.owner_client){
+        alert("会社名・商談日・顧客側担当者は必須です。");
+        return;
+      }
+    
+      // ★ 新規生成の見た目初期化（2件目以降の残像を消す）
+      const go   = $("#btn-go-analysis");   if (go)   go.style.display = "none";
+      const docx = $("#btn-download-docx"); if (docx) docx.style.display = "none";
+      const saved= $("#chip-saved");        if (saved) saved.style.display = "none";
+      $("#chat-box").innerHTML = "";
+      $("#minutes-preview").value = "";
+      $("#turns-pre").textContent = "（データなし）";
+    
+      // go running view（縦並び）
+      state.minutesStep = "running";
+      updateMinutesView();
+    
+      // text入力時は Step1/2は実施済表示、Step3のみスピン
+      if (state.inputMode==='text'){
+        markStepDone(1);
+        markStepDone(2);
+        markStepSpin(3);
+      }else{
+        markStepSpin(1);
+        // 2 と 3 は空に（ランプはグレーのまま）
+        $("#stp2").classList.remove("done","running"); $("#stp2-sub").textContent = "";
+        $("#stp3").classList.remove("done","running"); $("#stp3-sub").textContent = "";
+      }
+    
+      try{
+        let res;
+        if (state.inputMode==='audio'){
+          const f = $("#i-audio").files[0];
+          if (!f){ alert("音声ファイルを選択してください。"); return; }
+          const fd = new FormData();
+          fd.append("company", ctx.company);
+          fd.append("meeting_date", ctx.meeting_date);
+          fd.append("prev_stage", ctx.prev_stage);
+          fd.append("owner_bank", ctx.owner_bank);
+          fd.append("owner_client", ctx.owner_client);
+          fd.append("meetings_count", String(ctx.meetings_count));
+          if (ctx.amount!=null) fd.append("amount", String(ctx.amount));
+          fd.append("audio", f);
+          res = await api.postForm("/api/minutes/run_audio", fd);
+          markStepDone(1); markStepDone(2); markStepSpin(3);
+        }else{
+          const text = $("#i-transcript").value;
+          if (!text.trim()){ alert("商談テキストを入力してください。"); return; }
+          const payload = {
+            company: ctx.company,
+            meeting_date: ctx.meeting_date,
+            prev_stage: ctx.prev_stage,
+            amount: ctx.amount,
+            owner_bank: ctx.owner_bank,
+            owner_client: ctx.owner_client,
+            meetings_count: ctx.meetings_count,
+            transcript_text: text,
+            minutes_hint: ""
+          };
+          res = await api.postJSON("/api/minutes/run_text", payload);
+        }
+    
+        // store ids/results
+        state.meetingId = res.meeting_id || null;
+        state.evidence = res.evidence || null;
+        state.infer = res.infer || null;
+        state.narratives = res.narratives || null;
+        // ★ 追加：LLMコーチング文
+        state.coach_feedback = (res.coach_feedback || "").trim();
+    
+        // ステージ既定値
+        const stObj = state.infer?.suggested_changes?.stage || null;
+        const proposed = (stObj && stObj.to) || ctx.prev_stage;
+        state.stageSelected = coerceToValidStage(proposed, ctx.prev_stage);
+        $("#sel-stage").value = state.stageSelected;
+    
+        // 根拠＆提案
+        renderStageEvidence();
+        renderStageProposal();
+    
+        // 会話データ
+        await loadTurns(state.meetingId);
+    
+        // minutes 面
+        state.minutes_draft  = state.narratives?.minutes_draft || "";
+        state.manager_report = state.narratives?.manager_report_draft || "";
+        state.risks = state.infer?.risks || [];
+    
+        // 完了
+        markStepDone(3);
+    
+        // 編集へ
+        state.minutesStep = "edit";
+        updateMinutesView();
+      }catch(e){
+        alert("生成API失敗: " + e.message);
+        state.minutesStep = "input";
+        updateMinutesView();
+      }
+    });
+
+
+    async function loadTurns(meetingId){
+      if (!meetingId){ $("#turns-pre").textContent = "（データなし）"; return; }
+      const t = await api.get(`/api/meetings/turns?meeting_id=${encodeURIComponent(meetingId)}`);
+      state.turns = t.turns || [];
+      if (!state.turns.length){ $("#turns-pre").textContent = "（データなし）"; return; }
+      const lines = state.turns.map(tt=>{
+        const at = secToMMSS(tt.start);
+        const sp = tt.speaker_name || tt.speaker_label || "";
+        return `[${at}] ${sp}: ${tt.text||""}`;
+      }).join("\n");
+      $("#turns-pre").textContent = lines;
+    }
+
+    function secToMMSS(s){
+      const m = Math.floor(s/60), ss = Math.floor(s%60);
+      return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    }
+
+    // tabs edit / transcript
+    $$(".tab[data-edit-tab]").forEach(tab=>{
+      tab.addEventListener("click", ()=>{
+        $$(".tab[data-edit-tab]").forEach(t=>t.classList.remove("active"));
+        tab.classList.add("active");
+        const key = tab.dataset.editTab;
+        $("#edit-tab-edit").style.display = (key==="edit")?"block":"none";
+        $("#edit-tab-transcript").style.display = (key==="edit")?"none":"block";
+      });
+    });
+
+    function renderStageEvidence(){
+      const e = state.infer?.stage_change_evidence || [];
+      if (!e.length){ $("#stage-evidence").innerHTML = "（ステージ変更の根拠が抽出できませんでした）"; return; }
+      $("#stage-evidence").innerHTML = `
+        <div style="font-weight:600;color:#111;margin-bottom:.2rem">根拠</div>
+        ${e.map(x=>`<div style="border-left:3px solid var(--accent);padding:.35rem .5rem;margin:.35rem 0;background:#f9fafb;border-radius:6px">
+          <div style="color:var(--muted);font-size:.85rem">${x.at||""} ｜ <b>${x.speaker||""}</b></div>
+          <div>${escapeHtml(x.quote||"")}</div>
+        </div>`).join("")}
+      `;
+    }
+    function renderStageProposal(){
+      const st = state.infer?.suggested_changes?.stage || null;
+      const from = state.ctx?.prev_stage || "—";
+      // 既に state.stageSelected は初期化時に提案 to をセット済み
+      const toRaw = st?.to || state.stageSelected || from;
+
+      // 「同じ」を明示表現（商談 → 同じ）
+      const isSame = (toRaw === from);
+      const to = isSame ? "同じ" : toRaw;
+
+      // 確度は 0.0〜1.0 前提で % に（0〜100 の場合に備えて二重判定）
+      let confPct = "";
+      if (typeof st?.confidence === "number"){
+        confPct = (st.confidence <= 1 ? (st.confidence*100) : st.confidence).toFixed(0) + "%";
+      }
+
+      const lineEl = document.getElementById("stage-prop-line");
+      const whyEl  = document.getElementById("stage-prop-why");
+
+      if (lineEl){
+        lineEl.textContent = `LLM提案: ${from} → ${to}` + (confPct ? `（確度 ${confPct}）` : "");
+      }
+      if (whyEl){
+        const rationale = (st?.rationale || "").trim();
+        whyEl.textContent = rationale ? rationale : "（会話内容から自動判断）";
+      }
+
+      // セレクトは常に state.stageSelected を優先（run/refine 時に既に同期）
+      const sel = document.getElementById("sel-stage");
+      if (sel && sel.value !== state.stageSelected){
+        sel.value = state.stageSelected;
+      }
+    }
+
+
+    // chat
+    function addUserMsg(t){ const div=document.createElement("div"); div.className="msg user"; div.textContent=t; $("#chat-box").appendChild(div); scrollChat(); }
+    function addBotMsg(t){ const div=document.createElement("div"); div.className="msg bot"; div.textContent=t; $("#chat-box").appendChild(div); scrollChat(); }
+    function scrollChat(){ const el=$("#chat-box"); el.scrollTop = el.scrollHeight; }
+
+    $("#chat-send").addEventListener("click", async ()=>{
+      const msg = $("#chat-input").value.trim();
+      if (!msg) return;
+      addUserMsg(msg);
+      $("#chat-input").value = "";
+      setEditLocked(true);
+      try{
+        // ★ 正しい API に修正
+
+
+
+
+        // Guard: meeting_id が無ければ送れない
+        if (!state.meetingId){
+          addBotMsg("先に『議事録を生成』してください（meeting_id が未取得です）。");
+          setEditLocked(false);
+          return;
+        }
+
+        // サーバ実装差異に備え、互換キーを同時送信
+        const payload = {
+          meeting_id: state.meetingId,
+          user_instruction: msg,   // 実装A
+          instruction: msg,        // 実装B
+          minutes_md: $("#minutes-preview").value || state.minutes_draft || "",
+          selected_stage: state.stageSelected || state.ctx.prev_stage || "商談"
+        };
+
+        // まずは /refine_chat、失敗したら /refine にフォールバック
+        let res;
+        try{
+          res = await api.postJSON("/api/minutes/refine_chat", payload);
+        }catch(_){
+          res = await api.postJSON("/api/minutes/refine", payload);
+        }
+
+        const out = res.data || res;
+
+
+
+        if (out.minutes_draft) state.minutes_draft = out.minutes_draft;
+        if (out.manager_report_draft) state.manager_report = out.manager_report_draft;
+        if (Array.isArray(out.risks)) state.risks = out.risks;
+
+        // ★ 追加：コーチング文の更新（サーバが返せば反映）
+        if (out.coach_feedback) state.coach_feedback = out.coach_feedback;
+
+        if (state.minutesStep === "analysis") renderPhaseTips();
+
+        if (out.suggested_changes?.stage?.to){
+          const to = coerceToValidStage(out.suggested_changes.stage.to, state.stageSelected || state.ctx.prev_stage);
+          state.stageSelected = to;
+          $("#sel-stage").value = to;
+        }
+        $("#minutes-preview").value = state.minutes_draft;
+        renderStageProposal();   // ★ 追加：最新の提案内容に更新
+
+        renderStageEvidence();  //既存のやつ。
+        addBotMsg("更新しました。右側のプレビューに反映済みです。");
+      }catch(e){
+        addBotMsg("更新に失敗しました: " + e.message);
+      }finally{
+        setEditLocked(false);
+      }
+    });
+
+    function setEditLocked(locked){
+      $("#lock-edit").classList.toggle("show", locked);
+      $("#chat-input").disabled = locked;
+      $("#chat-send").disabled = locked;
+      $("#sel-stage").disabled = locked;
+      $("#minutes-preview").disabled = locked;
+      $("#btn-save-minutes").disabled = locked;
+    }
+
+    // stage change
+    $("#sel-stage").addEventListener("change", ()=> state.stageSelected = $("#sel-stage").value);
+
+    // save minutes ーーーーーーーーーーーーーーーーーーーーーーーーーー
+    $("#btn-save-minutes").addEventListener("click", async ()=>{
+      state.minutes_draft = $("#minutes-preview").value;
+      setEditLocked(true);
+      try{
+        // ラベルは infer.suggested_changes.labels_add を自動適用
+        const labels = state.infer?.suggested_changes?.labels_add || [];
+
+        const res = await api.postJSON("/api/minutes/save_final", {
+          meeting_id: state.meetingId,
+          minutes_md: state.minutes_draft,
+          selected_stage: state.stageSelected,
+          labels
+        });
+
+        // ✅ Word（.docx）ダウンロードは保存後に表示
+        const docx = $("#btn-download-docx");
+        if (docx){
+          if (res.docx_url){
+            docx.href = res.docx_url;
+            docx.style.display = "inline-block";
+          }else{
+            docx.style.display = "none";
+          }
+        }
+
+        // ✅ 商談分析へ進むボタンは保存後に表示
+        const go = $("#btn-go-analysis");
+        if (go) go.style.display = "inline-block";
+
+        // ✅ 「保存済み」チップ表示
+        const saved = $("#chip-saved");
+        if (saved) saved.style.display = "inline-flex";
+
+        // ダッシュボード更新
+        loadDashboard();
+      }catch(e){
+        alert("保存に失敗しました: " + e.message);
+      }finally{
+        setEditLocked(false);
+      }
+    });
+
+
+    // go analysis
+    $("#btn-go-analysis").addEventListener("click", ()=>{
+      state.minutesStep = "analysis";
+      renderAnalysis();
+      updateMinutesView();
+    });
+
+    function escapeHtml(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+    function updateMinutesView(){
+    $("#min-step-input").style.display    = (state.minutesStep==="input")?"block":"none";
+    $("#min-step-running").style.display  = (state.minutesStep==="running")?"block":"none";
+    $("#min-step-edit").style.display     = (state.minutesStep==="edit")?"block":"none";
+    $("#min-step-analysis").style.display = (state.minutesStep==="analysis")?"block":"none";
+
+    if (state.minutesStep==="edit") {
+      $("#sel-stage").value = state.stageSelected;
+      $("#minutes-preview").value = state.minutes_draft;
+
+      // ここで #btn-go-analysis を表示しない（保存後にだけ表示）
+      //const go = $("#btn-go-analysis");
+      //if (go) go.style.display = go.style.display || "none";
+    }
+    if (state.minutesStep==="analysis") renderAnalysis();
+  }
+
+
+
+  // back buttons
+  const backToInput = document.getElementById("btn-back-to-input");
+  if (backToInput){
+    backToInput.addEventListener("click", ()=>{
+      state.minutesStep="input";
+      updateMinutesView();
+    });
+  }
+  const backToEdit = document.getElementById("btn-back-to-edit");
+  if (backToEdit){
+    backToEdit.addEventListener("click", ()=>{
+      state.minutesStep="edit";
+      updateMinutesView();
+    });
+  }
+
+    // -------------------- analysis --------------------
+    function renderAnalysis(){
+        // タブ切り替え
+        $$(".tab[data-ana-tab]").forEach(tab=>{
+            tab.onclick = ()=>{
+                $$(".tab[data-ana-tab]").forEach(t=>t.classList.remove("active"));
+                tab.classList.add("active");
+                const key = tab.dataset.anaTab;
+                $("#ana-tab-risks").style.display = (key==="risks") ? "block" : "none";
+                $("#ana-tab-coach").style.display = (key==="coach") ? "block" : "none";
+            };
+        });
+
+        // 上司への報告
+        $("#manager-report").textContent = state.manager_report || "（上司向けの簡潔な報告はありません）";
+
+        const willAddWarn = (state.infer?.suggested_changes?.labels_add || []).includes("要注意");
+        document.getElementById("risk-label-suggest").style.display = willAddWarn ? "inline-flex" : "none";
+
+
+        // リスク一覧
+        const rl = $("#risk-list");
+        rl.innerHTML = (state.risks||[]).map((r)=>`
+            <div style="border:1px solid var(--border);border-radius:10px;padding:.75rem;margin-bottom:.6rem">
+                <div><b>[${r.severity||""}] ${r.category||""}</b></div>
+                ${r.context_summary? `<div style="margin-top:.4rem"><i>全体要約:</i> ${escapeHtml(r.context_summary)}</div>`:""}
+                ${r.evidence_span? `<pre style="white-space:pre-wrap;background:#f9fafb;border:1px solid var(--border);padding:.5rem;border-radius:8px;margin-top:.5rem">${escapeHtml(r.evidence_span)}</pre>`:""}
+                ${r.action? `<div style="margin-top:.4rem"><i>推奨対応:</i> ${escapeHtml(r.action)}</div>`:""}
+            </div>
+        `).join("");
+
+        // 会話バランス（円グラフ）—話者判定を堅牢化
+        let bank = 0, client = 0;
+        const bankName = (state.ctx.owner_bank || "").trim();
+
+        for (const t of (state.turns || [])){
+            const text = (t.text || "").replace(/\s+/g,"");
+            const len  = [...text].length;
+
+            const name  = (t.speaker_name || t.speaker || t.speaker_label || "").trim();
+            const label = (t.speaker_label || "").toLowerCase();
+
+            // 優先度：label → 明示名一致 → 含意語判定
+            const isBankByLabel =
+                ["bank","sales","seller","agent","banker","営業","銀行"].some(k => label.includes(k));
+
+            const isBankByName  =
+                bankName && name && (name === bankName);
+
+            const isBankByHint  =
+                /銀行|営業|担当|bank|sales/i.test(name);
+
+            const isBank = isBankByLabel || isBankByName || isBankByHint;
+
+            if (isBank) bank += len; else client += len;
+        }
+
+        let total = bank + client;
+        // 全ゼロのときは見栄え優先で 50/50 に
+        if (!total){ bank = 1; client = 1; total = 2; }
+
+        const bankRatio   = bank / total * 100;
+        const clientRatio = 100 - bankRatio;
+
+        Plotly.newPlot("pie", [{
+            type:"pie",
+            labels:["顧客","営業担当"],
+            values:[clientRatio, bankRatio],
+            hole:.3,
+            textinfo:"none",
+            textposition: "outside",
+            // ★ 追加：少数1桁で統一、注釈非表示
+            hovertemplate: "%{label}: %{value:.1f}%<extra></extra>",
+            texttemplate: "%{label}<br>%{value:.1f}%"
+        }], {
+          margin: {t: 10, b: 10, l: 40, r: 40},
+          height: 300,
+          showlegend: false                          // 凡例は不要なら非表示
+        }, { displayModeBar: false });
+
+        // 会話バランスに関するフィードバックのみ表示
+        const coach = $("#coach-msg");
+        if (bankRatio <= 40){
+          coach.innerHTML = `✔️ <b>理想的な会話バランスです。</b>（営業 ${bankRatio.toFixed(1)}%） 顧客の話を十分に引き出せています。`;
+        }else{
+          coach.innerHTML = `⚠️ <b>営業側の発話がやや多めです。</b>（営業 ${bankRatio.toFixed(1)}%） 次回はオープン質問を増やし、顧客が話す時間を確保しましょう。`;
+        }
+
+// フェーズに基づくアドバイスは別枠へ
+renderPhaseTips();
+
+    }
+    function renderPhaseTips(){
+      const el = $("#phase-tips");
+      if (!el) return;
+
+      const txt = (state.coach_feedback || "").trim();
+      if (txt){
+        el.textContent = txt; // LLM 出力を優先
+        return;
+      }
+
+      // フォールバック（テンプレ）
+      const from = state.ctx?.prev_stage || "商談";
+      const toRaw = state.stageSelected || from;
+      const to = (toRaw === from) ? "同じ" : toRaw;
+      const key = `${from}→${to}`;
+
+      const phaseGuidelines = {
+        "商談→同じ": "意思決定者/評価軸/タイムラインの具体化。次回提案ドラフト合意。",
+        "商談→提案・概算条件の提示": "価格以外の比較軸と審査必要書類の先出し。次回合意事項を明確に。",
+        "提案・概算条件の提示→申込・審査": "審査阻害要因の先回り解消（体制/書類/稟議順）。",
+        "申込・審査→稟議書認証": "リスクへの対案（担保/保証/コベナンツ）で稟議論点を事前に潰す。",
+        "稟議書認証→契約手続き": "誰が/いつ/何をサインするか段取りを詰める。",
+        "契約手続き→融資実行": "実行条件のToDo（登記/入金口座/日程）と逆算スケジュール。"
+      };
+
+      el.textContent = phaseGuidelines[key] || "（該当するフェーズガイダンスはありません）";
+    }
+
+
+
+    // === 新しい議事録を開始（状態とUIの初期化） ===
+    function resetMinutesFlow(){
+      // state 初期化
+      state.minutesStep = "input";
+      state.inputMode   = "text";
+      state.amountMode  = "unset";
+      state.ctx = {
+        company:"", meeting_date:"", prev_stage:"商談",
+        owner_bank:"田中真奈美", owner_client:"", meetings_count:1, amount:null
+      };
+      state.meetingId = null;
+      state.turns = []; state.evidence = null; state.infer = null; state.narratives = null;
+      state.stageSelected = "商談";
+      state.minutes_draft = ""; state.manager_report = ""; state.risks = [];
+      state.docxUrl = ""; state.pdfUrl = "";
+      state.coach_feedback = ""; // ★ 追加：前回のアドバイスをクリア
+
+      // 入力フォームを初期化
+      $("#i-company").value = "";
+      $("#i-date").value = "";
+      $("#i-prev-stage").value = "商談";
+      $("#i-owner-bank").value = "田中真奈美";
+      $("#i-owner-client").value = "";
+      $("#i-meetings").value = "1";
+
+      // 金額モード
+      const rUnset = document.querySelector("input[name='amountMode'][value='unset']");
+      const rSet   = document.querySelector("input[name='amountMode'][value='set']");
+      if (rUnset) rUnset.checked = true;
+      if (rSet)   rSet.checked   = false;
+      $("#i-amount").style.display = "none";
+      $("#i-amount").value = "";
+
+      // 入力モード（テキスト）
+      const rAudio = document.querySelector("input[name='inputMode'][value='audio']");
+      const rText  = document.querySelector("input[name='inputMode'][value='text']");
+      if (rText) rText.checked = true;
+      $("#box-audio").style.display = "none";
+      $("#box-text").style.display  = "block";
+
+      // UI リセット（ボタン・プレビュー等）
+      const go   = $("#btn-go-analysis"); if (go)   go.style.display   = "none";
+      const docx = $("#btn-download-docx"); if (docx) docx.style.display = "none";
+      const saved= $("#chip-saved"); if (saved) saved.style.display = "none";
+      $("#chat-box").innerHTML = "";
+      $("#minutes-preview").value = "";
+      $("#turns-pre").textContent = "（データなし）";
+
+      updateMinutesView();
+    }
+
+// 分析画面の右上ボタン
+const newBtn = document.getElementById("btn-new-minutes");
+if (newBtn) newBtn.addEventListener("click", resetMinutesFlow);
+
+
+
+    // -------------------- page router --------------------
+    $$(".nav-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const page = btn.dataset.page;
+        setPage(page);
+      });
+    });
+
+    // -------------------- performance (bars) --------------------
+    async function renderPerformance(){
+      const m = await api.get("/api/metrics/performance").catch(()=>null);
+      if (m){
+        $("#kpi-achv").textContent = (m.target_achievement_pct||104) + "%";
+      }else{
+        $("#kpi-achv").textContent = "104%";
+      }
+
+      const weeks = [
+        "5月-1","5月-2","5月-3","5月-4",
+        "6月-1","6月-2","6月-3","6月-4",
+        "7月-1","7月-2","7月-3","7月-4",
+        "8月-1","8月-2","8月-3","8月-4"
+      ];
+      const val = [44,51,47,60, 55,49,52,46, 57,61,53,48, 59,54,62,50];
+      const target = 50;
+
+      const trace = {
+        type:'bar',
+        x: weeks,
+        y: val,
+        marker:{color: getComputedStyle(document.documentElement).getPropertyValue('--blue').trim() || 'rgba(59,130,246,0.55)'}
+      };
+      const layout = {
+        margin:{t:10,r:10,b:40,l:40},
+        shapes: [{
+          type:'line', x0:-0.5, x1:weeks.length-0.5, y0:target, y1:target,
+          line:{color:'#9CA3AF', width:1, dash:'dot'}
+        }],
+        yaxis:{title:'件数'},
+        xaxis:{tickangle:-30}
+      };
+      Plotly.newPlot('weekly-bars',[trace],layout,{displayModeBar:false});
+    }
+
+    // -------------------- init --------------------
+    (async function init(){
+      await loadDashboard();
+      // デフォで performance KPI 一度描画（値は固定＋API結果）
+      renderPerformance();
+    })();
+  </script>
+</body>
+</html>

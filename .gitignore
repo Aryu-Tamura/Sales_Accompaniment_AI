@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local env
+.env
+.vscode/
+.idea/
+
+# DB runtime & outputs
+db/runtime.db
+exports/
+_tmp_*
